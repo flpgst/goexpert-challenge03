@@ -14,8 +14,8 @@ import (
 	"github.com/flpgst/golang-studies/55-CleanArch/internal/infra/graph"
 	"github.com/flpgst/golang-studies/55-CleanArch/internal/infra/grpc/pb"
 	"github.com/flpgst/golang-studies/55-CleanArch/internal/infra/grpc/service"
-	"github.com/flpgst/golang-studies/55-CleanArch/internal/infra/web/webserver"
 	"github.com/flpgst/golang-studies/55-CleanArch/pkg/events"
+	"github.com/go-chi/chi/v5"
 	"github.com/streadway/amqp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -45,12 +45,18 @@ func main() {
 	listOrderUseCase := NewListOrderUseCase(db)
 
 	// webserver
-	webserver := webserver.NewWebServer(configs.WebServerPort)
+
 	webOrderHandler := NewWebOrderHandler(db, eventDispatcher)
-	webserver.AddHandler("/order", webOrderHandler.Create)
-	webserver.AddHandler("/order", webOrderHandler.List)
+	router := chi.NewRouter()
+	router.Route("/order", func(r chi.Router) {
+		r.Post("/", webOrderHandler.Create)
+		r.Get("/", webOrderHandler.List)
+	})
+	// webserver := webserver.NewWebServer(configs.WebServerPort)
+	// webserver.AddHandler("/order", webOrderHandler.Create)
+	// webserver.AddHandler("/order", webOrderHandler.List)
 	fmt.Println("Listening on port", configs.WebServerPort)
-	go webserver.Start()
+	go http.ListenAndServe(":"+configs.WebServerPort, router)
 
 	// grpc
 	grpcServer := grpc.NewServer()
