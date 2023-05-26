@@ -1,18 +1,39 @@
 version: "3"
 
 services:
-  mysql:
+  mysqldb:
     image: mysql:5.7
+    networks:
+      - mysqldb
     container_name: mysql
     restart: always
     environment:
+      MYSQL_USER: myuser
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: orders
       MYSQL_PASSWORD: root
     ports:
       - 3306:3306
     volumes:
-      - .docker/mysql:/var/lib/mysql
+      - mysqldata:/var/lib/mysql
+      - ./internal/infra/database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  migrate:
+    image: migrate/migrate
+    networks:
+      - default
+      - mysqldb
+    volumes:
+      - ./internal/infra/database/migrations:/migrations
+    command: "-path=/migrations -database 'mysql://root:root@tcp(mysqldb:3306)/orders' up"
+    depends_on:
+      mysqldb:
+        condition: service_healthy
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -24,3 +45,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+volumes:
+  mysqldata:
+networks:
+  mysqldb:
